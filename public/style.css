@@ -327,6 +327,12 @@ body {
     border: 1px solid #30363d;
     border-radius: 6px;
     overflow: hidden;
+    transition: border-color 0.2s ease;
+}
+
+.message-selected {
+    border-color: #ffd33d !important;
+    box-shadow: 0 0 0 1px #ffd33d;
 }
 
 .message-header {

@@ -1,6 +1,13 @@
 # Claude Threads Viewer
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-14+-green.svg)](https://nodejs.org/)
+[![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-blue.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 A lightweight web viewer for Claude Code conversation files with a terminal-inspired ASCII aesthetic. Browse and search through your Claude Code projects and conversations in a clean, vim-style interface.
+
+<img src="claude-threads.jpeg" alt="Claude Threads Viewer Interface" width="80%">
 
 ## Features
 

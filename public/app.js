@@ -5,6 +5,10 @@ class ClaudeViewer {
         this.projects = [];
         this.conversations = [];
         
+        // Message navigation state
+        this.currentMessageIndex = -1;
+        this.messageElements = [];
+        
         this.initializeElements();
         this.bindEvents();
         this.loadLayoutPreferences();
@@ -180,16 +184,16 @@ class ClaudeViewer {
                     e.preventDefault();
                     this.navigateProjects(1);
                     break;
-                case 'arrowup': // Scroll conversation detail up
+                case 'arrowup': // Navigate to previous message
                     if (this.detailPaneFocused && this.currentConversation) {
                         e.preventDefault();
-                        this.scrollDetailPane(-50);
+                        this.navigateToPreviousMessage();
                     }
                     break;
-                case 'arrowdown': // Scroll conversation detail down
+                case 'arrowdown': // Navigate to next message
                     if (this.detailPaneFocused && this.currentConversation) {
                         e.preventDefault();
-                        this.scrollDetailPane(50);
+                        this.navigateToNextMessage();
                     }
                     break;
                 case 'g': // Go to first
@@ -350,6 +354,57 @@ class ClaudeViewer {
         const detailPane = document.getElementById('conversation-detail');
         if (detailPane) {
             detailPane.scrollTop += amount;
+        }
+    }
+    
+    navigateToNextMessage() {
+        if (this.messageElements.length === 0) return;
+        
+        // Remove current selection
+        if (this.currentMessageIndex >= 0 && this.currentMessageIndex < this.messageElements.length) {
+            this.messageElements[this.currentMessageIndex].classList.remove('message-selected');
+        }
+        
+        // Move to next message (with wrapping)
+        this.currentMessageIndex = (this.currentMessageIndex + 1) % this.messageElements.length;
+        
+        // Add selection to new message
+        const newMessage = this.messageElements[this.currentMessageIndex];
+        newMessage.classList.add('message-selected');
+        newMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    navigateToPreviousMessage() {
+        if (this.messageElements.length === 0) return;
+        
+        // Remove current selection
+        if (this.currentMessageIndex >= 0 && this.currentMessageIndex < this.messageElements.length) {
+            this.messageElements[this.currentMessageIndex].classList.remove('message-selected');
+        }
+        
+        // Move to previous message (with wrapping)
+        this.currentMessageIndex = this.currentMessageIndex <= 0 ? 
+            this.messageElements.length - 1 : this.currentMessageIndex - 1;
+        
+        // Add selection to new message
+        const newMessage = this.messageElements[this.currentMessageIndex];
+        newMessage.classList.add('message-selected');
+        newMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    initializeMessageNavigation() {
+        // Get all message elements in the conversation
+        this.messageElements = Array.from(this.conversationContent.querySelectorAll('.message'));
+        
+        // Reset selection state
+        this.messageElements.forEach(msg => msg.classList.remove('message-selected'));
+        
+        // Start at first message if any exist
+        if (this.messageElements.length > 0) {
+            this.currentMessageIndex = 0;
+            this.messageElements[0].classList.add('message-selected');
+        } else {
+            this.currentMessageIndex = -1;
         }
     }
     
@@ -557,6 +612,10 @@ class ClaudeViewer {
             // Clear conversation detail
             this.conversationContent.innerHTML = '<div class="help-text">Select a conversation to view details</div>';
             
+            // Reset message navigation state
+            this.currentMessageIndex = -1;
+            this.messageElements = [];
+            
             // Update URL if needed
             if (updateUrl) {
                 const project = this.projects.find(p => p.name === projectName);
@@ -668,6 +727,9 @@ class ClaudeViewer {
             // Initialize syntax highlighting and expandable sections
             this.initializeCodeHighlighting();
             this.initializeExpandables();
+            
+            // Initialize message navigation
+            this.initializeMessageNavigation();
         } catch (error) {
             console.error('Error rendering conversation:', error);
             this.conversationContent.innerHTML = '<div class="help-text error">Error loading conversation content</div>';
