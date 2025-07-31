@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Claude Code Viewer</title>
+    <link rel="stylesheet" href="/style.css">
+    <!-- Add basic polyfills for older browsers -->
+    <script>
+        // Polyfill for Promise (IE11 and older)
+        if (!window.Promise) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"><\/script>');
+        }
+        // Polyfill for fetch (IE and older browsers)
+        if (!window.fetch) {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/whatwg-fetch@3.6.2/dist/fetch.umd.js"><\/script>');
+        }
+    </script>
+</head>
+<body>
+    <div class="terminal">
+        <div class="terminal-header">
+            <div class="terminal-title">
+                ┌─[claude-viewer@local]─[~/.claude/projects]
+                │
+                └─$ Claude Code Project Viewer
+            </div>
+            <div class="terminal-controls">
+                <button id="toggle-sidebar" class="btn btn-small" title="Toggle Projects Panel" aria-label="Toggle projects sidebar">[◧]</button>
+                <button id="toggle-conversations" class="btn btn-small" title="Toggle Conversations Panel" aria-label="Toggle conversations panel">[☰]</button>
+                <label for="search-input" class="sr-only">Search conversations</label>
+                <input type="text" id="search-input" placeholder="search conversations..." class="search-box" aria-label="Search conversations" maxlength="200">
+                <button id="search-btn" class="btn" aria-label="Execute search">[SEARCH]</button>
+            </div>
+        </div>
+
+        <div class="terminal-body">
+            <nav class="sidebar" id="sidebar" role="navigation" aria-label="Projects navigation">
+                <div class="section">
+                    <div class="section-header">
+                        ├── PROJECTS
+                    </div>
+                    <div class="section-content" id="projects-list" role="list">
+                        <div class="loading">Loading projects...</div>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="resize-handle" id="sidebar-resize"></div>
+
+            <main class="main-content">
+                <section class="conversations-panel" id="conversations-panel" aria-label="Conversations">
+                    <div class="section">
+                        <div class="section-header">
+                            ├── CONVERSATIONS
+                        </div>
+                        <div class="section-content" id="conversations-list" role="list">
+                            <div class="help-text">
+                                Select a project to view conversations
+
+                                <pre>┌───────── USAGE ─────────┐
+│ • Click project to view │
+│ • Click conversation    │
+│ • Use search to find    │
+│ • Tool calls highlight  │
+│ • j/k keys navigate     │
+└─────────────────────────┘</pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="resize-handle horizontal" id="conversation-resize"></div>
+
+                <section class="conversation-detail" id="conversation-detail">
+                    <div class="section">
+                        <div class="section-header">
+                            ├── CONVERSATION DETAIL
+                        </div>
+                        <div class="section-content" id="conversation-content" role="main" aria-live="polite">
+                            <div class="help-text">Select a conversation to view details</div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <div class="terminal-footer">
+            <div class="status-bar">
+                <span id="status-text">Ready</span>
+                <span class="separator">│</span>
+                <span id="project-count">0 projects</span>
+                <span class="separator">│</span>
+                <span id="conversation-count">0 conversations</span>
+                <span class="separator">│</span>
+                <span class="keyboard-shortcuts">
+                    <kbd>j/k</kbd> navigate <kbd>h/l</kbd> projects <kbd>↵</kbd> select <kbd>↑/↓</kbd> scroll <kbd>1/2</kbd> toggle <kbd>/</kbd> search <kbd>g/G</kbd> first/last
+                </span>
+                <span class="separator">│</span>
+                <span class="time" id="current-time"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Minimal highlight.js replacement for basic syntax highlighting
+        window.hljs = {
+            highlightElement: function(element) {
+                // Basic JSON highlighting
+                const content = element.textContent;
+                if (element.classList.contains('json')) {
+                    element.innerHTML = content
+                        .replace(/(".*?")/g, '<span style="color: #7ee787;">$1</span>')
+                        .replace(/(\{|\}|\[|\])/g, '<span style="color: #58a6ff;">$1</span>')
+                        .replace(/(true|false|null)/g, '<span style="color: #ffd33d;">$1</span>');
+                }
+            }
+        };
+    </script>
+    <script src="/app.js"></script>
+</body>
+</html>
