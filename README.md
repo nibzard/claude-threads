@@ -7,7 +7,7 @@
 
 A lightweight web viewer for Claude Code conversation files with a terminal-inspired ASCII aesthetic. Browse and search through your Claude Code projects and conversations in a clean, vim-style interface.
 
-<img src="claude-threads.jpeg" alt="Claude Threads Viewer Interface" width="80%">
+<img src="assets/claude-threads.jpeg" alt="Claude Threads Viewer Interface" width="80%">
 
 ## Features
 
@@ -53,6 +53,8 @@ npm run dev
 - Modern web browser with ES6 support
 
 ## Usage
+
+![Claude Threads Demo](assets/claude-threads.gif)
 
 1. **Browse Projects**: Click on projects in the left sidebar or use `h/l` keys
 2. **View Conversations**: Click on conversations or use `j/k` keys to navigate

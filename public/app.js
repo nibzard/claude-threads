@@ -47,6 +47,12 @@ class ClaudeViewer {
         this.toggleConversationsBtn = document.getElementById('toggle-conversations');
         this.sidebarResize = document.getElementById('sidebar-resize');
         this.conversationResize = document.getElementById('conversation-resize');
+        this.projectsSortTypeBtn = document.getElementById('projects-sort-type-btn');
+        this.projectsSortDirBtn = document.getElementById('projects-sort-dir-btn');
+        
+        // Sorting state
+        this.projectSortMode = 'alphabetical'; // 'alphabetical' or 'recent'
+        this.projectSortDirection = 'asc'; // 'asc' or 'desc'
         
         // Verify critical elements exist
         if (!this.sidebar || !this.conversationsPanel || !this.toggleSidebarBtn || !this.toggleConversationsBtn) {
@@ -65,6 +71,8 @@ class ClaudeViewer {
             if (e.key === 'Enter') this.performSearch();
         });
         this.exportBtn.addEventListener('click', () => this.exportConversation());
+        this.projectsSortTypeBtn.addEventListener('click', () => this.toggleProjectSortType());
+        this.projectsSortDirBtn.addEventListener('click', () => this.toggleProjectSortDirection());
         
         // Clear search on escape
         this.searchInput.addEventListener('keydown', (e) => {
@@ -540,6 +548,8 @@ class ClaudeViewer {
             }
             
             this.projects = await response.json();
+            this.sortProjects(); // Sort projects on initial load
+            this.updateSortButtons(); // Set initial button states
             this.renderProjects();
             this.updateProjectCount();
             this.setStatus('Ready');
@@ -588,6 +598,68 @@ class ClaudeViewer {
                 }
             });
         });
+    }
+    
+    toggleProjectSortType() {
+        // Toggle between alphabetical and date
+        this.projectSortMode = this.projectSortMode === 'alphabetical' ? 'recent' : 'alphabetical';
+        
+        // Update sort buttons
+        this.updateSortButtons();
+        
+        // Re-sort and render projects
+        this.sortProjects();
+        this.renderProjects();
+    }
+    
+    toggleProjectSortDirection() {
+        // Toggle between ascending and descending
+        this.projectSortDirection = this.projectSortDirection === 'asc' ? 'desc' : 'asc';
+        
+        // Update sort buttons
+        this.updateSortButtons();
+        
+        // Re-sort and render projects
+        this.sortProjects();
+        this.renderProjects();
+    }
+    
+    updateSortButtons() {
+        // Update sort type button
+        if (this.projectSortMode === 'alphabetical') {
+            this.projectsSortTypeBtn.innerHTML = '[α]';
+            this.projectsSortTypeBtn.title = 'Currently: Alphabetical • Click for: Date';
+        } else {
+            this.projectsSortTypeBtn.innerHTML = '[d]';
+            this.projectsSortTypeBtn.title = 'Currently: Date • Click for: Alphabetical';
+        }
+        
+        // Update sort direction button
+        if (this.projectSortDirection === 'asc') {
+            this.projectsSortDirBtn.innerHTML = '[↑]';
+            this.projectsSortDirBtn.title = 'Currently: Ascending • Click for: Descending';
+        } else {
+            this.projectsSortDirBtn.innerHTML = '[↓]';
+            this.projectsSortDirBtn.title = 'Currently: Descending • Click for: Ascending';
+        }
+    }
+    
+    sortProjects() {
+        if (this.projectSortMode === 'alphabetical') {
+            this.projects.sort((a, b) => {
+                const nameA = (a.projectName || a.displayName).toLowerCase();
+                const nameB = (b.projectName || b.displayName).toLowerCase();
+                const result = nameA.localeCompare(nameB);
+                return this.projectSortDirection === 'asc' ? result : -result;
+            });
+        } else { // recent
+            this.projects.sort((a, b) => {
+                const dateA = a.stats && a.stats.mostRecentDate ? new Date(a.stats.mostRecentDate) : new Date(0);
+                const dateB = b.stats && b.stats.mostRecentDate ? new Date(b.stats.mostRecentDate) : new Date(0);
+                const result = dateB - dateA; // Most recent first when desc
+                return this.projectSortDirection === 'desc' ? result : -result;
+            });
+        }
     }
     
     async selectProject(projectName, updateUrl = true) {

@@ -133,6 +133,55 @@ body {
     border-color: #58a6ff;
 }
 
+/* Sort controls container */
+.sort-controls {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+/* Sort button styling */
+.sort-btn {
+    background-color: transparent;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+    min-width: 24px;
+}
+
+.sort-btn:hover {
+    background-color: #21262d;
+    border-color: #58a6ff;
+    opacity: 1;
+}
+
+.sort-btn:active {
+    background-color: #1c2128;
+    border-color: #7ee787;
+}
+
+/* Make section header flexbox to position sort button */
+.section-header {
+    background-color: #21262d;
+    padding: 8px 16px;
+    border-bottom: 1px solid #30363d;
+    color: #7ee787;
+    font-weight: bold;
+    font-size: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
 /* Terminal Body */
 .terminal-body {
     flex: 1;
@@ -215,17 +264,6 @@ body {
     padding: 0;
 }
 
-.section-header {
-    background-color: #21262d;
-    padding: 8px 16px;
-    border-bottom: 1px solid #30363d;
-    color: #7ee787;
-    font-weight: bold;
-    font-size: 12px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
 
 .section-content {
     padding: 16px;

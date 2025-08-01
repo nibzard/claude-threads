@@ -37,6 +37,50 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // Serve static files from public directory  
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Helper function to get verified project info from conversation files using cwd
+async function getProjectInfoFromCwd(projectPath) {
+  try {
+    const files = await readdir(projectPath);
+    const jsonlFiles = files.filter(file => file.endsWith('.jsonl'));
+    
+    // Try to find cwd from the first few conversation files
+    for (const file of jsonlFiles.slice(0, 3)) {
+      try {
+        const filePath = path.join(projectPath, file);
+        const stats = await stat(filePath);
+        
+        // Skip large files to avoid performance issues
+        if (stats.size > 10 * 1024 * 1024) continue;
+        
+        const content = await readFile(filePath, { encoding: 'utf8', flag: 'r' });
+        const lines = content.split('\n').filter(line => line.trim());
+        
+        // Look for the first non-summary line with cwd
+        for (const line of lines.slice(0, 5)) { // Check first 5 lines only
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.type !== 'summary' && parsed.cwd) {
+              return {
+                cwd: parsed.cwd,
+                projectName: path.basename(parsed.cwd)
+              };
+            }
+          } catch (e) {
+            // Skip malformed lines
+          }
+        }
+      } catch (e) {
+        // Skip problematic files
+      }
+    }
+    
+    return null; // No cwd found
+  } catch (error) {
+    console.error('Error getting project info from cwd:', error);
+    return null;
+  }
+}
+
 // Project scanning functions
 async function scanProjects() {
   try {
@@ -49,17 +93,22 @@ async function scanProjects() {
       .filter(dirent => dirent.isDirectory())
       .map(async dirent => {
         const fullPath = decodeProjectName(dirent.name);
-        const projectName = path.basename(fullPath);
+        const fallbackProjectName = path.basename(fullPath);
         const projectPath = path.join(CLAUDE_PROJECTS_PATH, dirent.name);
+        
+        // Try to get verified project name and path from conversation files using cwd
+        const verifiedProjectInfo = await getProjectInfoFromCwd(projectPath);
+        const projectName = verifiedProjectInfo?.projectName || fallbackProjectName;
+        const displayPath = verifiedProjectInfo?.cwd || fullPath;
         
         // Get message counts for this project
         const stats = await getProjectStats(projectPath);
         
         return {
           name: dirent.name,
-          displayName: fullPath, // Keep full path for reference
-          projectName: projectName, // Just the project name
-          urlName: createUrlSafeName(projectName), // Use project name for URL
+          displayName: displayPath, // Use verified path from cwd or fallback
+          projectName: projectName, // Use verified project name from cwd or fallback
+          urlName: createUrlSafeName(projectName), // Use verified project name for URL
           path: projectPath,
           stats: stats
         };
@@ -81,6 +130,7 @@ async function getProjectStats(projectPath) {
     let assistantMessages = 0;
     let userMessages = 0;
     let conversationCount = 0;
+    let mostRecentDate = null;
     
     for (const file of jsonlFiles) {
       try {
@@ -95,6 +145,11 @@ async function getProjectStats(projectPath) {
         
         conversationCount++;
         
+        // Track most recent conversation date from file modification time
+        if (!mostRecentDate || stats.mtime > mostRecentDate) {
+          mostRecentDate = stats.mtime;
+        }
+        
         for (const line of lines) {
           try {
             const message = JSON.parse(line);
@@ -102,6 +157,14 @@ async function getProjectStats(projectPath) {
             // Skip summary entries in stats calculation
             if (message.type === 'summary') {
               continue;
+            }
+            
+            // Also check message timestamps for more accurate recent date
+            if (message.timestamp) {
+              const messageDate = new Date(message.timestamp);
+              if (!mostRecentDate || messageDate > mostRecentDate) {
+                mostRecentDate = messageDate;
+              }
             }
             
             totalMessages++;
@@ -124,7 +187,8 @@ async function getProjectStats(projectPath) {
       totalMessages,
       assistantMessages,
       userMessages,
-      conversationCount
+      conversationCount,
+      mostRecentDate
     };
   } catch (error) {
     console.error('Error getting project stats:', error);
@@ -132,7 +196,8 @@ async function getProjectStats(projectPath) {
       totalMessages: 0,
       assistantMessages: 0,
       userMessages: 0,
-      conversationCount: 0
+      conversationCount: 0,
+      mostRecentDate: null
     };
   }
 }
