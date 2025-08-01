@@ -321,6 +321,42 @@ body {
     justify-content: space-between;
 }
 
+/* Enhanced conversation card styles */
+.conversation-summary {
+    color: #f0f6fc;
+    font-size: 11px;
+    margin-top: 2px;
+    font-style: italic;
+    opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.conversation-meta-enhanced {
+    color: #8b949e;
+    font-size: 11px;
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.conversation-meta-left {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.conversation-meta-right {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 /* Message Rendering */
 .message {
     margin: 16px 0;

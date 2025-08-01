@@ -98,6 +98,12 @@ async function getProjectStats(projectPath) {
         for (const line of lines) {
           try {
             const message = JSON.parse(line);
+            
+            // Skip summary entries in stats calculation
+            if (message.type === 'summary') {
+              continue;
+            }
+            
             totalMessages++;
             
             if (message.type === 'assistant') {
@@ -192,21 +198,47 @@ async function scanConversations(projectPath) {
         continue;
       }
       
-      // Read first line to get session info
+      // Read first non-summary line to get session info and extract summary
       const content = await readFile(filePath, { encoding: 'utf8', flag: 'r' });
-      const firstLine = content.split('\n')[0];
+      const lines = content.split('\n').filter(line => line.trim());
       let sessionInfo = { sessionId: file.replace('.jsonl', ''), timestamp: stats.mtime };
+      let summary = null;
       
-      try {
-        const parsed = JSON.parse(firstLine);
-        sessionInfo = {
-          sessionId: parsed.sessionId || file.replace('.jsonl', ''),
-          timestamp: new Date(parsed.timestamp || stats.mtime),
-          cwd: parsed.cwd || '',
-          gitBranch: parsed.gitBranch || ''
-        };
-      } catch (e) {
-        // Use file stats if parsing fails
+      // First pass: extract summary if it exists
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === 'summary' && parsed.summary) {
+            summary = parsed.summary;
+            break; // Use the first summary found
+          }
+        } catch (e) {
+          // Skip malformed lines
+        }
+      }
+      
+      // Second pass: find the first non-summary line for session metadata
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type !== 'summary') {
+            sessionInfo = {
+              sessionId: parsed.sessionId || file.replace('.jsonl', ''),
+              timestamp: new Date(parsed.timestamp || stats.mtime),
+              cwd: parsed.cwd || '',
+              gitBranch: parsed.gitBranch || '',
+              summary: summary
+            };
+            break;
+          }
+        } catch (e) {
+          // Skip malformed lines
+        }
+      }
+      
+      // If we only found summary entries, still include the summary
+      if (summary && !sessionInfo.summary) {
+        sessionInfo.summary = summary;
       }
       
       conversations.push({

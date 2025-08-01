@@ -34,6 +34,7 @@ class ClaudeViewer {
         this.conversationContent = document.getElementById('conversation-content');
         this.searchInput = document.getElementById('search-input');
         this.searchBtn = document.getElementById('search-btn');
+        this.exportBtn = document.getElementById('export-btn');
         this.statusText = document.getElementById('status-text');
         this.projectCount = document.getElementById('project-count');
         this.conversationCount = document.getElementById('conversation-count');
@@ -63,6 +64,7 @@ class ClaudeViewer {
         this.searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.performSearch();
         });
+        this.exportBtn.addEventListener('click', () => this.exportConversation());
         
         // Clear search on escape
         this.searchInput.addEventListener('keydown', (e) => {
@@ -565,11 +567,12 @@ class ClaudeViewer {
         this.projectsList.innerHTML = this.projects.map(project => {
             const stats = project.stats || { totalMessages: 0, assistantMessages: 0, userMessages: 0 };
             const statsText = `(${stats.totalMessages}/${stats.assistantMessages}/${stats.userMessages})`;
+            const tooltipText = `Message counts - Total: ${stats.totalMessages}, Assistant: ${stats.assistantMessages}, User: ${stats.userMessages}`;
             
             return `
                 <div class="project-item" data-project="${this.escapeHtml(project.name)}" role="listitem" tabindex="0">
                     <div class="project-name">${this.escapeHtml(project.projectName || project.displayName)}</div>
-                    <div class="project-stats">${statsText}</div>
+                    <div class="project-stats" title="${this.escapeHtml(tooltipText)}">${statsText}</div>
                     <div class="project-path">${this.escapeHtml(project.displayName)}</div>
                 </div>
             `;
@@ -595,6 +598,7 @@ class ClaudeViewer {
         
         this.currentProject = projectName;
         this.currentConversation = null;
+        this.updateExportButtonVisibility();
         
         try {
             this.setStatus('Loading conversations...');
@@ -638,17 +642,28 @@ class ClaudeViewer {
             return;
         }
         
-        this.conversationsList.innerHTML = this.conversations.map(conv => `
-            <div class="conversation-item" data-filename="${this.escapeHtml(conv.filename)}" role="listitem" tabindex="0">
-                <div class="conversation-id">${this.truncateText(this.escapeHtml(conv.sessionId), 25)}</div>
-                <div class="conversation-meta">
-                    <span>${this.formatDate(conv.timestamp)}</span>
-                    <span>${this.formatBytes(conv.size)}</span>
+        this.conversationsList.innerHTML = this.conversations.map(conv => {
+            // Use consistent 3-row layout for all conversations
+            const leftInfo = [];
+            if (conv.cwd) leftInfo.push(`📁 ${this.truncateText(this.escapeHtml(conv.cwd), 30)}`);
+            if (conv.gitBranch) leftInfo.push(`🌿 ${this.escapeHtml(conv.gitBranch)}`);
+            
+            return `
+                <div class="conversation-item" data-filename="${this.escapeHtml(conv.filename)}" role="listitem" tabindex="0">
+                    <div class="conversation-id">${this.truncateText(this.escapeHtml(conv.sessionId), 25)}</div>
+                    <div class="conversation-summary">${conv.summary ? this.truncateText(this.escapeHtml(conv.summary), 60) : ''}</div>
+                    <div class="conversation-meta-enhanced">
+                        <div class="conversation-meta-left">
+                            ${leftInfo.join(' ')}
+                        </div>
+                        <div class="conversation-meta-right">
+                            <span>${this.formatDate(conv.timestamp)}</span>
+                            <span>${this.formatBytes(conv.size)}</span>
+                        </div>
+                    </div>
                 </div>
-                ${conv.cwd ? `<div class="conversation-meta"><span>📁 ${this.truncateText(this.escapeHtml(conv.cwd), 40)}</span></div>` : ''}
-                ${conv.gitBranch ? `<div class="conversation-meta"><span>🌿 ${this.escapeHtml(conv.gitBranch)}</span></div>` : ''}
-            </div>
-        `).join('');
+            `;
+        }).join('');
         
         // Bind click and keyboard events
         this.conversationsList.querySelectorAll('.conversation-item').forEach(item => {
@@ -681,6 +696,7 @@ class ClaudeViewer {
             const conversation = await response.json();
             this.renderConversation(conversation);
             this.setStatus('Ready');
+            this.updateExportButtonVisibility();
             
             // Focus the detail pane for arrow key scrolling
             this.detailPaneFocused = true;
@@ -738,12 +754,15 @@ class ClaudeViewer {
     }
     
     renderMessage(message, index) {
-        const timestamp = new Date(message.timestamp).toLocaleString();
+        const timestamp = this.formatDate(message.timestamp);
         const messageType = message.type || 'unknown';
         
         let content = '';
         
-        if (message.message) {
+        // Handle summary entries specially
+        if (messageType === 'summary') {
+            content = `<div class="summary-content">📝 ${this.escapeHtml(message.summary || 'No summary available')}</div>`;
+        } else if (message.message) {
             if (message.message.content) {
                 if (typeof message.message.content === 'string') {
                     content = this.renderTextContent(message.message.content);
@@ -1004,7 +1023,9 @@ class ClaudeViewer {
     
     // Utility functions
     formatDate(dateString) {
+        if (!dateString) return 'No date';
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'No date';
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
     
@@ -1056,6 +1077,13 @@ class ClaudeViewer {
         this.currentTime.textContent = new Date().toLocaleTimeString();
     }
     
+    updateExportButtonVisibility() {
+        const hasConversation = this.currentConversation && 
+                               this.conversationContent && 
+                               !this.conversationContent.innerHTML.includes('Select a conversation');
+        this.exportBtn.style.display = hasConversation ? 'inline-block' : 'none';
+    }
+    
     // Layout preferences management
     saveLayoutPreferences() {
         const preferences = {
@@ -1098,6 +1126,349 @@ class ClaudeViewer {
             }
         } catch (error) {
             console.error('Error loading layout preferences:', error);
+        }
+    }
+    
+    // Export functionality
+    getExportCSS() {
+        return `
+            <style>
+                /* Base styles */
+                * {
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
+                }
+                
+                body {
+                    font-family: 'Fira Code', 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
+                    background-color: #0d1117;
+                    color: #c9d1d9;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    padding: 20px;
+                    max-width: 100%;
+                }
+                
+                /* Conversation styles */
+                .conversation-header {
+                    background-color: #21262d;
+                    padding: 16px;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                    margin-bottom: 16px;
+                    color: #c9d1d9;
+                    font-size: 13px;
+                }
+                
+                .conversation-header strong {
+                    color: #7ee787;
+                }
+                
+                /* Message styles */
+                .message {
+                    margin: 16px 0;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                    overflow: hidden;
+                    background-color: #161b22;
+                }
+                
+                .message-header {
+                    background-color: #21262d;
+                    padding: 8px 16px;
+                    border-bottom: 1px solid #30363d;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-size: 12px;
+                }
+                
+                .message-type {
+                    font-weight: bold;
+                    text-transform: uppercase;
+                }
+                
+                .message-type.user {
+                    color: #58a6ff;
+                }
+                
+                .message-type.assistant {
+                    color: #7ee787;
+                }
+                
+                .message-type.summary {
+                    color: #f85149;
+                }
+                
+                .message-type.tool-result {
+                    color: #f85149;
+                }
+                
+                .message-timestamp {
+                    color: #8b949e;
+                    font-size: 11px;
+                }
+                
+                .message-content {
+                    padding: 16px;
+                    font-size: 13px;
+                    line-height: 1.5;
+                }
+                
+                /* Summary content */
+                .summary-content {
+                    color: #f85149;
+                    font-weight: bold;
+                }
+                
+                /* Tool use styles */
+                .tool-use {
+                    background-color: #0d1117;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                    margin: 12px 0;
+                    overflow: hidden;
+                }
+                
+                .tool-header {
+                    background-color: #21262d;
+                    padding: 8px 16px;
+                    border-bottom: 1px solid #30363d;
+                    color: #f85149;
+                    font-weight: bold;
+                    font-size: 12px;
+                }
+                
+                .tool-content {
+                    padding: 16px;
+                    font-family: 'Fira Code', monospace;
+                    font-size: 12px;
+                }
+                
+                /* Code blocks */
+                .code-block {
+                    background-color: #0d1117;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin: 12px 0;
+                    overflow-x: auto;
+                    font-family: 'Fira Code', monospace;
+                    font-size: 12px;
+                }
+                
+                /* Syntax highlighting */
+                .code-block .json-string { color: #7ee787; }
+                .code-block .json-number { color: #58a6ff; }
+                .code-block .json-boolean { color: #ffd33d; }
+                .code-block .json-null { color: #f85149; }
+                .code-block .json-key { color: #58a6ff; font-weight: bold; }
+                
+                pre {
+                    margin: 0;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                }
+                
+                code {
+                    background-color: #21262d;
+                    padding: 2px 6px;
+                    border-radius: 3px;
+                    font-family: inherit;
+                }
+                
+                /* Thinking blocks */
+                .thinking-block {
+                    background-color: #161b22;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                    padding: 16px;
+                    margin: 12px 0;
+                    color: #8b949e;
+                    font-style: italic;
+                }
+                
+                .thinking-header {
+                    color: #f85149;
+                    font-weight: bold;
+                    margin-bottom: 8px;
+                    text-transform: uppercase;
+                    font-size: 11px;
+                }
+                
+                /* Expandable sections */
+                .expandable {
+                    cursor: pointer;
+                    position: relative;
+                }
+                
+                .expandable::before {
+                    content: "▶ ";
+                    display: inline-block;
+                    transition: transform 0.2s;
+                }
+                
+                .expandable.expanded::before {
+                    transform: rotate(90deg);
+                }
+                
+                .collapsible-content {
+                    display: none;
+                }
+                
+                .collapsible-content.expanded {
+                    display: block;
+                }
+                
+                /* Message metadata */
+                .message-meta {
+                    margin-top: 12px;
+                    padding-top: 8px;
+                    border-top: 1px solid #30363d;
+                    color: #8b949e;
+                    font-size: 11px;
+                }
+                
+                /* Links and interactive elements */
+                a {
+                    color: #58a6ff;
+                    text-decoration: none;
+                }
+                
+                a:hover {
+                    text-decoration: underline;
+                }
+                
+                /* Typography improvements */
+                h1, h2, h3, h4, h5, h6 {
+                    color: #f0f6fc;
+                    margin: 16px 0 8px 0;
+                }
+                
+                p {
+                    margin: 8px 0;
+                }
+                
+                ul, ol {
+                    margin: 8px 0;
+                    padding-left: 20px;
+                }
+                
+                li {
+                    margin: 4px 0;
+                }
+                
+                blockquote {
+                    border-left: 4px solid #30363d;
+                    padding-left: 16px;
+                    margin: 8px 0;
+                    color: #8b949e;
+                    font-style: italic;
+                }
+                
+                /* Print styles */
+                @media print {
+                    body {
+                        background-color: white;
+                        color: black;
+                    }
+                    
+                    .message {
+                        border: 1px solid #ccc;
+                        page-break-inside: avoid;
+                    }
+                    
+                    .message-header {
+                        background-color: #f5f5f5;
+                    }
+                }
+            </style>
+        `;
+    }
+    
+    exportConversation() {
+        // Check if conversation is loaded
+        if (!this.currentConversation || !this.conversationContent.innerHTML || 
+            this.conversationContent.innerHTML.includes('Select a conversation')) {
+            alert('Please select a conversation to export');
+            return;
+        }
+        
+        try {
+            // Get conversation content
+            const conversationHTML = this.conversationContent.innerHTML;
+            
+            // Get current conversation info for filename
+            const currentConv = this.conversations.find(c => c.filename === this.currentConversation);
+            const sessionId = currentConv ? currentConv.sessionId || this.currentConversation.replace('.jsonl', '') : 'conversation';
+            const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+            const filename = `${sessionId.substring(0, 8)}_${dateStr}.html`;
+            
+            // Create complete HTML document
+            const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Conversation - ${this.escapeHtml(sessionId)}</title>
+    ${this.getExportCSS()}
+    <script>
+        // Enable expandable sections in exported HTML
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.expandable').forEach(function(element) {
+                element.addEventListener('click', function() {
+                    this.classList.toggle('expanded');
+                    const content = this.nextElementSibling;
+                    if (content && content.classList.contains('collapsible-content')) {
+                        content.classList.toggle('expanded');
+                    }
+                });
+            });
+        });
+    </script>
+</head>
+<body>
+    <h1>Claude Code Conversation Export</h1>
+    <p><strong>Exported:</strong> ${new Date().toLocaleString()}</p>
+    <p><strong>Project:</strong> ${this.currentProject ? this.escapeHtml(this.currentProject) : 'Unknown'}</p>
+    <hr style="margin: 20px 0; border: 1px solid #30363d;">
+    
+    ${conversationHTML}
+    
+    <hr style="margin: 20px 0; border: 1px solid #30363d;">
+    <footer style="margin-top: 20px; text-align: center; color: #8b949e; font-size: 11px;">
+        <p>Exported from Claude Code Project Viewer</p>
+    </footer>
+</body>
+</html>`;
+            
+            // Create blob and download
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create download link and trigger
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show success message briefly
+            const originalText = this.statusText.textContent;
+            this.setStatus(`Exported: ${filename}`);
+            setTimeout(() => {
+                this.setStatus(originalText);
+            }, 3000);
+            
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Failed to export conversation. Please try again.');
         }
     }
 }
