@@ -49,7 +49,7 @@ async function scanProjects() {
       .filter(dirent => dirent.isDirectory())
       .map(async dirent => {
         const fullPath = decodeProjectName(dirent.name);
-        const projectName = path.basename(fullPath); // Extract just the project name
+        const projectName = path.basename(fullPath);
         const projectPath = path.join(CLAUDE_PROJECTS_PATH, dirent.name);
         
         // Get message counts for this project
@@ -141,7 +141,32 @@ function decodeProjectName(encodedName) {
   // Convert encoded project name back to readable path
   // Handle Unicode characters properly
   try {
-    return decodeURIComponent(encodedName.replace(/^-/, '').replace(/-/g, '/'));
+    const withoutPrefix = encodedName.replace(/^-/, '');
+    let decoded = decodeURIComponent(withoutPrefix.replace(/-/g, '/'));
+    
+    // Check if the decoded path actually exists, if not, try to be smarter about dashes
+    const testPath = '/' + decoded;
+    if (!fs.existsSync(testPath)) {
+      // Try different dash interpretations for common patterns
+      // Look for patterns like "projectname-v3" or "projectname-version"
+      const segments = withoutPrefix.split('-');
+      
+      // Try combining last segments that look like version numbers
+      for (let i = segments.length - 2; i >= 0; i--) {
+        const lastSegment = segments[segments.length - 1];
+        if (lastSegment.match(/^v\d+$/) || lastSegment.match(/^\d+$/)) {
+          // Looks like a version, try combining with previous segment
+          const combined = segments.slice(0, i).join('/') + '/' + segments.slice(i).join('-');
+          const testCombined = '/' + combined;
+          if (fs.existsSync(testCombined)) {
+            decoded = combined;
+            break;
+          }
+        }
+      }
+    }
+    
+    return decoded;
   } catch (error) {
     // Fallback for malformed encoding
     return encodedName.replace(/^-/, '').replace(/-/g, '/');
